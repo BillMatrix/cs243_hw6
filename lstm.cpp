@@ -368,14 +368,14 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     size_t hsize = h.cols();
     const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
     auto h_Wf = matmul(h, Wf);
-    const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
+    const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
     auto x_Uf = matmul(x, Uf);
     const VectorView<float> bf(biases, 0, hsize);
     auto f_pre = cwise_add(h_Wf, x_Uf), bf)
     auto f = cwise_unary_op(broadcast_add_second(f_pre, sigmoid);
+    const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
     const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
     const MatrixView<float> Wc(weights, 0, 3*hsize, hsize, hsize);
-    const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
     const MatrixView<float> Ui(weights, hsize, hsize, xsize, hsize);
     const MatrixView<float> Uo(weights, hsize, 2*hsize, xsize, hsize);
     const MatrixView<float> Uc(weights, hsize, 3*hsize, xsize, hsize);
@@ -437,6 +437,7 @@ int main(int argc, const char** argv)
         Timer tm(CLOCK_MONOTONIC);
 
         kernel_lstm(weights, biases, x, h, c, hprime, cprime);
+        serial_lstm(weights, biases, x, h, c, hprime, cprime);
 
         uint64_t time = tm.read();
         if (i < 5)
