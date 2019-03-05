@@ -371,7 +371,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
     auto x_Uf = matmul(x, Uf);
     const VectorView<float> bf(biases, 0, hsize);
-    auto f_pre = cwise_add(h_Wf, x_Uf), bf)
+    auto f_pre = cwise_add(h_Wf, x_Uf), bf);
     auto f = cwise_unary_op(broadcast_add_second(f_pre, sigmoid);
     const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
     const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
