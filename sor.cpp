@@ -234,6 +234,7 @@ void parallel_sor(Matrix<float>& m, float c)
 {
     SyncVariable syncVars[m.rows()];
 // BEGIN YOUR CODE HERE
+#pragma omp parallel for collapse(1)
     for (size_t p = 1; p < m.rows(); p++) {
         for (size_t j = 1; j < m.cols(); j++) {
             if (p == 1) {
