@@ -273,8 +273,8 @@ int main(int argc, const char** argv)
 
         Timer tm(CLOCK_MONOTONIC);
 
-        serial_sor(m, c);
-        //parallel_sor(m, c);
+        // serial_sor(m, c);
+        parallel_sor(m, c);
 
         uint64_t time = tm.read();
         if (i < 5)
