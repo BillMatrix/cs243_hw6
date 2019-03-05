@@ -215,7 +215,7 @@ public:
 
 // (optional) BEGIN YOUR CODE HERE
 
-// Add any constant, define, class or struct type that you find useful
+#define BLOCK_SIZE 128
 
 // (optional) END YOUR CODE HERE
 
@@ -229,14 +229,12 @@ void serial_sor(Matrix<float>& m, float c)
     }
 }
 
-#define BLOCK_SIZE 128
-
 static
 void parallel_sor(Matrix<float>& m, float c)
 {
     SyncVariable syncVars[m.rows()];
 // BEGIN YOUR CODE HERE
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(1)
     for (size_t p = 1; p < m.rows(); p += BLOCK_SIZE) {
         for (size_t pp = p; pp < std::min(m.rows(), p + BLOCK_SIZE); pp++) {
             for (size_t j = 1; j < m.cols(); j++) {
