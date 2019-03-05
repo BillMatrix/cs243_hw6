@@ -364,7 +364,31 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 {
 // BEGIN YOUR CODE HERE
 
-// Write the serial implementation of LSTM here
+    size_t xsize = x.cols();
+    size_t hsize = h.cols();
+    const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
+    auto h_Wf = matmul(h, Wf);
+    const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
+    auto x_Uf = matmul(x, Uf);
+    const VectorView<float> bf(biases, 0, hsize);
+    auto f_pre = cwise_add(h_Wf, x_Uf), bf);
+    auto f = cwise_unary_op(broadcast_add_second(f_pre, sigmoid);
+    const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
+    const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
+    const MatrixView<float> Wc(weights, 0, 3*hsize, hsize, hsize);
+    const MatrixView<float> Ui(weights, hsize, hsize, xsize, hsize);
+    const MatrixView<float> Uo(weights, hsize, 2*hsize, xsize, hsize);
+    const MatrixView<float> Uc(weights, hsize, 3*hsize, xsize, hsize);
+    const VectorView<float> bi(biases, hsize, hsize);
+    const VectorView<float> bo(biases, 2*hsize, hsize);
+    const VectorView<float> bc(biases, 3*hsize, hsize);
+
+    auto i = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wi), matmul(x, Ui)), bi), sigmoid);
+    auto o = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wo), matmul(x, Uo)), bo), sigmoid);
+
+    auto tmp = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wc), matmul(x, Uc)), bc), std::tanh);
+    cprime = cwise_add(cwise_mul(f, c), cwise_mul(i, tmp));
+    hprime = cwise_mul(o, cwise_unary_op(cprime, std::tanh));
 
 // END YOUR CODE HERE
 }
@@ -413,6 +437,7 @@ int main(int argc, const char** argv)
         Timer tm(CLOCK_MONOTONIC);
 
         kernel_lstm(weights, biases, x, h, c, hprime, cprime);
+        serial_lstm(weights, biases, x, h, c, hprime, cprime);
 
         uint64_t time = tm.read();
         if (i < 5)

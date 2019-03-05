@@ -215,7 +215,7 @@ public:
 
 // (optional) BEGIN YOUR CODE HERE
 
-// Add any constant, define, class or struct type that you find useful
+#define BLOCK_SIZE 128
 
 // (optional) END YOUR CODE HERE
 
@@ -249,49 +249,49 @@ void parallel_sor(Matrix<float>& m, float c)
       syncVars[p].increment();
     }
   }
-  // END YOUR CODE HERE
 }
 
 int main(int argc, const char** argv)
 {
-  size_t row1, col1;
-  if (argc < 3) {
-    std::cerr << "usage:" << argv[0] << " <ROW1> <COL1>" << std::endl;
-    return 1;
-  }
-  row1 = std::stoul(argv[1]);
-  col1 = std::stoul(argv[2]);
+    size_t row1, col1;
+    if (argc < 3) {
+        std::cerr << "usage:" << argv[0] << " <ROW1> <COL1>" << std::endl;
+        return 1;
+    }
+    row1 = std::stoul(argv[1]);
+    col1 = std::stoul(argv[2]);
 
-  std::mt19937_64 random_engine;
-  std::normal_distribution<float> distribution{0, 1};
+    std::mt19937_64 random_engine(123);
+    std::normal_distribution<float> distribution{0, 1};
 
-  const int NUM_ITERATIONS = 20;
-  uint64_t sum_time = 0;
-  uint64_t sum_time_squared = 0;
+    const int NUM_ITERATIONS = 20;
+    uint64_t sum_time = 0;
+    uint64_t sum_time_squared = 0;
 
-  // ignore the first 5 iterations as the processor warms up
-  for (int i = 5; i < 5+NUM_ITERATIONS; i++) {
-    Matrix<float> m = generate_matrix<float>(row1, col1, distribution, random_engine);
-    float c = distribution(random_engine);
+    // ignore the first 5 iterations as the processor warms up
+    for (int i = 5; i < 5+NUM_ITERATIONS; i++) {
+        Matrix<float> m = generate_matrix<float>(row1, col1, distribution, random_engine);
+        float c = distribution(random_engine);
 
-    Timer tm(CLOCK_MONOTONIC);
+        Timer tm(CLOCK_MONOTONIC);
 
-    // serial_sor(m, c);
-    parallel_sor(m, c);
+        // serial_sor(m, c);
 
-    uint64_t time = tm.read();
-    if (i < 5)
-      continue;
-    std::cerr << "Iteration " << (i-5+1) << ": " << time << " us" << std::endl;
-    sum_time += time;
-    sum_time_squared += time * time;
-  }
+        parallel_sor(m, c);
 
-  double avg_time = ((double)sum_time/NUM_ITERATIONS);
-  double avg_time_squared = ((double)sum_time_squared/NUM_ITERATIONS);
-  double std_dev = sqrt(avg_time_squared - avg_time * avg_time);
-  std::cerr << std::setprecision(0) << std::fixed;
-  std::cerr << "Avg time: " << avg_time << " us" << std::endl;
-  std::cerr << "Stddev: ±" << std_dev << " us" << std::endl;
-  return 0;
+        uint64_t time = tm.read();
+        if (i < 5)
+            continue;
+        std::cerr << "Iteration " << (i-5+1) << ": " << time << " us" << std::endl;
+        sum_time += time;
+        sum_time_squared += time * time;
+    }
+
+    double avg_time = ((double)sum_time/NUM_ITERATIONS);
+    double avg_time_squared = ((double)sum_time_squared/NUM_ITERATIONS);
+    double std_dev = sqrt(avg_time_squared - avg_time * avg_time);
+    std::cerr << std::setprecision(0) << std::fixed;
+    std::cerr << "Avg time: " << avg_time << " us" << std::endl;
+    std::cerr << "Stddev: ±" << std_dev << " us" << std::endl;
+    return 0;
 }
