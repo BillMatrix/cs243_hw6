@@ -261,7 +261,7 @@ int main(int argc, const char** argv)
     row1 = std::stoul(argv[1]);
     col1 = std::stoul(argv[2]);
 
-    std::mt19937_64 random_engine;
+    std::mt19937_64 random_engine(123);
     std::normal_distribution<float> distribution{0, 1};
 
     const int NUM_ITERATIONS = 20;
@@ -276,6 +276,7 @@ int main(int argc, const char** argv)
         Timer tm(CLOCK_MONOTONIC);
 
         // serial_sor(m, c);
+
         parallel_sor(m, c);
 
         uint64_t time = tm.read();
