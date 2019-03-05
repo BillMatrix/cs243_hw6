@@ -229,24 +229,27 @@ void serial_sor(Matrix<float>& m, float c)
     }
 }
 
+#define BLOCK_SIZE 128
+
 static
 void parallel_sor(Matrix<float>& m, float c)
 {
-    SyncVariable syncVars[m.rows()];
+    SyncVariable syncVars[m.rows() / BLOCK_SIZE + 1];
 // BEGIN YOUR CODE HERE
 #pragma omp parallel for collapse(1)
-    for (size_t p = 1; p < m.rows(); p++) {
-        for (size_t j = 1; j < m.cols(); j++) {
-            if (p == 1) {
-                m.at(p, j) = c * (m.at(p - 1, j) + m.at(p, j - 1));
-            } else {
-                syncVars[p - 1].wait_until(j);
-                m.at(p, j) = c * (m.at(p - 1, j) + m.at(p, j - 1));
+    for (size_t p = 1; p < m.rows(); p += BLOCK_SIZE) {
+        for (size_t pp = p; pp < std::min(m.rows(), p + BLOCK_SIZE); pp++) {
+            for (size_t j = 1; j < m.cols(); j++) {
+                if (pp == 1) {
+                    m.at(pp, j) = c * (m.at(pp - 1, j) + m.at(pp, j - 1));
+                } else {
+                    syncVars[p - 1].wait_until(j + (pp - p) * m.cols());
+                    m.at(pp, j) = c * (m.at(pp - 1, j) + m.at(pp, j - 1));
+                }
+                syncVars[p].increment();
             }
-            syncVars[p].increment();
         }
     }
-
 // END YOUR CODE HERE
 }
 
