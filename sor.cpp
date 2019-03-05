@@ -239,7 +239,7 @@ void parallel_sor(Matrix<float>& m, float c)
             if (p == 1) {
                 m.at(p, j) = c * (m.at(p - 1, j) + m.at(p, j - 1));
             } else {
-                syncVars[p - 1].wait_until(j)
+                syncVars[p - 1].wait_until(j);
                 m.at(p, j) = c * (m.at(p - 1, j) + m.at(p, j - 1));
             }
             syncVars[p].increment();
