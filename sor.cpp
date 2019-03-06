@@ -288,7 +288,7 @@ int main(int argc, const char** argv)
 	// print_mat(m);
 
         parallel_sor(m, c);
-	// print_mat(m);
+        // print_mat(m);
 
         uint64_t time = tm.read();
         if (i < 5)
