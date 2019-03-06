@@ -481,7 +481,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
                  const Matrix<float>& x, const Matrix<float>& h, const Matrix<float>& c,
                  Matrix<float>& hprime, Matrix<float>& cprime)
 {
-
+  // See parallel_lstm for design decision documentation
   static const size_t COL_BLOCK = 32;
   static const size_t ROW_BLOCK = 32;
 
@@ -546,6 +546,7 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
 {
 // BEGIN YOUR CODE HERE
 
+// 32 X 32 Blocks
   static const size_t COL_BLOCK = 32;
   static const size_t ROW_BLOCK = 32;
 
@@ -557,6 +558,17 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
   const VectorView<float> bo(biases, 2*hsize, hsize);
   const VectorView<float> bc(biases, 3*hsize, hsize);
 
+// Here we use a 2D parallel loop
+// The idea is that since all computations to h' and c' are independent
+// We can compute h' and c' block by block in parallel
+// p is going through colomns block by block
+// pp is going through batches block by block
+// For x and h, we would fetch BLOCK_SIZE of rows and
+// for each W and U matrices, we would fetch BLOCK_SIZE of columns
+// Using those slices, we can compute a corresponding BLOCK_SIZE X BLOCK_SIZE
+// for h' and c'.
+// Since all computation for h' and c' are independent, we access the corresponding
+// memory locations of h' and c' and store data in parallel too.
 #pragma omp parallel for collapse(2) schedule(static, 1)
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
     for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
