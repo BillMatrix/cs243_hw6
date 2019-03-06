@@ -215,7 +215,7 @@ public:
 
 // (optional) BEGIN YOUR CODE HERE
 
-#define BLOCK_SIZE 128
+#define BLOCK_SIZE 32
 
 // (optional) END YOUR CODE HERE
 
@@ -229,17 +229,15 @@ void serial_sor(Matrix<float>& m, float c)
     }
 }
 
-#define BLOCK_SIZE 128
-
 static
 void parallel_sor(Matrix<float>& m, float c)
 {
   SyncVariable syncVars[m.rows()];
-  #pragma omp parallel for collapse(1) schedule(static, 1)
+  #pragma omp parallel for schedule(static, 1)
   for (size_t p = 1; p < m.rows(); p += BLOCK_SIZE) {
     for (size_t j = 1; j < m.cols(); j += BLOCK_SIZE) {
       if (p != 1) {
-	syncVars[p - BLOCK_SIZE].wait_until(j / BLOCK_SIZE);
+	syncVars[p - BLOCK_SIZE].wait_until((j + BLOCK_SIZE - 1) / BLOCK_SIZE);
       }
       for (size_t jj = j; jj < std::min(m.cols(), j + BLOCK_SIZE); jj++) {
         for (size_t pp = p; pp < std::min(m.rows(), p + BLOCK_SIZE); pp++) {
@@ -249,6 +247,16 @@ void parallel_sor(Matrix<float>& m, float c)
       syncVars[p].increment();
     }
   }
+}
+
+static void print_mat(const Matrix<float> mat){
+    for (size_t i = 0; i < mat.rows(); i ++) {
+      for (size_t j = 0; j < mat.cols(); j ++) {
+        std::cout << mat.at(i, j) << ", ";
+      }
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
 }
 
 int main(int argc, const char** argv)
@@ -274,10 +282,13 @@ int main(int argc, const char** argv)
         float c = distribution(random_engine);
 
         Timer tm(CLOCK_MONOTONIC);
+	
+	// print_mat(m);
+        // serial_sor(m, c);
+	// print_mat(m);
 
-        serial_sor(m, c);
-
-        // parallel_sor(m, c);
+        parallel_sor(m, c);
+	// print_mat(m);
 
         uint64_t time = tm.read();
         if (i < 5)
