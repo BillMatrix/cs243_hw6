@@ -6,18 +6,6 @@
 #include <cstring>
 #include <string>
 #include <time.h>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <cstdio>
-#include <semaphore.h>
-#ifdef __linux__
-#include <linux/futex.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <sys/syscall.h>
-#include <limits.h>
-#endif
 
 template<typename T> class Matrix;
 
@@ -121,67 +109,6 @@ public:
     }
 };
 
-/**
-SyncVariable: a variable that you can wait on.
-
-It supports two operations: one increments the variable,
-and the other waits until the variable reaches the given value.
-
-You should use this primitive to implement pipelined parallelism.
-
-Two implementations are provided. One is generic, using C++11 mutexes
-and condition variables, the other is Linux/GCC-specific but has less
-overhead.
-If you are interested in the Linux implementation, see "man 2 futex".
-**/
-
-#ifdef __linux__
-static int
-futex(volatile int *uaddr, int futex_op, int val,
-     const struct timespec *timeout, int *uaddr2, int val3)
-{
-   return syscall(SYS_futex, uaddr, futex_op, val,
-                  timeout, uaddr, val3);
-}
-
-class SyncVariable {
-private:
-    volatile int count = 0;
-
-public:
-    void increment() {
-        __atomic_add_fetch(&count, 1, __ATOMIC_RELEASE);
-        futex(&count, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
-    }
-
-    void wait_until(int value) {
-        int v;
-        while ((v = __atomic_load_n(&count, __ATOMIC_ACQUIRE)) < value)
-            futex(&count, FUTEX_WAIT, v, nullptr, nullptr, 0);
-    }
-};
-#else
-class SyncVariable {
-private:
-    size_t count = 0;
-    std::mutex mutex;
-    std::condition_variable cond;
-
-public:
-    void increment() {
-        std::lock_guard<std::mutex> lock(mutex);
-        count++;
-        cond.notify_all();
-    }
-
-    void wait_until(size_t value) {
-        std::unique_lock<std::mutex> lock(mutex);
-        while (count < value)
-            cond.wait(lock);
-    }
-};
-#endif
-
 template<typename T, typename Distribution, typename RandomNumberGenerator>
 static Matrix<T>
 generate_matrix(size_t rows, size_t cols, Distribution& d, RandomNumberGenerator& g)
@@ -213,18 +140,29 @@ public:
     }
 };
 
-// (optional) BEGIN YOUR CODE HERE
-
-#define BLOCK_SIZE 128
-
-// (optional) END YOUR CODE HERE
+static
+void serial_matmul(const Matrix<float>& m1, const Matrix<float>& m2, Matrix<float>& m3)
+{
+    for (size_t i = 0; i < m1.rows(); i++) {
+        for (size_t j = 0; j < m2.cols(); j++) {
+            float acc = 0;
+            for (size_t k = 0; k < m2.rows(); k++)
+                acc += m1.at(i, k) * m2.at(k, j);
+            m3.at(i, j) = acc;
+        }
+    }
+}
 
 static
-void serial_sor(Matrix<float>& m, float c)
+void naive_parallel_matmul(const Matrix<float>& m1, const Matrix<float>& m2, Matrix<float>& m3)
 {
-    for (size_t i = 1; i < m.rows(); i++) {
-        for (size_t j = 1; j < m.cols(); j++) {
-            m.at(i, j) = c * (m.at(i-1, j) + m.at(i, j-1));
+#pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < m1.rows(); i++) {
+        for (size_t j = 0; j < m2.cols(); j++) {
+            float acc = 0;
+            for (size_t k = 0; k < m2.rows(); k++)
+                acc += m1.at(i, k) * m2.at(k, j);
+            m3.at(i, j) = acc;
         }
     }
 }
@@ -232,36 +170,36 @@ void serial_sor(Matrix<float>& m, float c)
 #define BLOCK_SIZE 128
 
 static
-void parallel_sor(Matrix<float>& m, float c)
+void blocked_parallel_matmul(const Matrix<float>& m1, const Matrix<float>& m2, Matrix<float>& m3)
 {
-  SyncVariable syncVars[m.rows()];
-  #pragma omp parallel for collapse(1) schedule(static, 1)
-  for (size_t p = 1; p < m.rows(); p += BLOCK_SIZE) {
-    for (size_t j = 1; j < m.cols(); j += BLOCK_SIZE) {
-      if (p != 1) {
-	syncVars[p - BLOCK_SIZE].wait_until(j / BLOCK_SIZE);
-      }
-      for (size_t jj = j; jj < std::min(m.cols(), j + BLOCK_SIZE); jj++) {
-        for (size_t pp = p; pp < std::min(m.rows(), p + BLOCK_SIZE); pp++) {
-	  m.at(pp, jj) = c * (m.at(pp - 1, jj) + m.at(pp, jj - 1));
+    m3.set_zero();
+
+#pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < m1.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < m2.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(m1.rows(), i+BLOCK_SIZE); ii++) {
+                    for (size_t jj = j; jj < std::min(m2.cols(), j+BLOCK_SIZE); jj++) {
+                        m3.at(ii, jj) += m1.at(ii, k) * m2.at(k, jj);
+                    }
+                }
+            }
         }
-      }
-      syncVars[p].increment();
     }
-  }
 }
 
 int main(int argc, const char** argv)
 {
-    size_t row1, col1;
-    if (argc < 3) {
-        std::cerr << "usage:" << argv[0] << " <ROW1> <COL1>" << std::endl;
+    size_t row1, col1, col2;
+    if (argc < 4) {
+        std::cerr << "usage:" << argv[0] << " <ROW1> <COL1> <COL2>" << std::endl;
         return 1;
     }
     row1 = std::stoul(argv[1]);
     col1 = std::stoul(argv[2]);
+    col2 = std::stoul(argv[3]);
 
-    std::mt19937_64 random_engine(123);
+    std::mt19937_64 random_engine;
     std::normal_distribution<float> distribution{0, 1};
 
     const int NUM_ITERATIONS = 20;
@@ -270,14 +208,15 @@ int main(int argc, const char** argv)
 
     // ignore the first 5 iterations as the processor warms up
     for (int i = 5; i < 5+NUM_ITERATIONS; i++) {
-        Matrix<float> m = generate_matrix<float>(row1, col1, distribution, random_engine);
-        float c = distribution(random_engine);
+        Matrix<float> m1 = generate_matrix<float>(row1, col1, distribution, random_engine);
+        Matrix<float> m2 = generate_matrix<float>(col1, col2, distribution, random_engine);
+        Matrix<float> result(m1.rows(), m2.cols());
 
         Timer tm(CLOCK_MONOTONIC);
 
-        serial_sor(m, c);
-
-        // parallel_sor(m, c);
+        // serial_matmul(m1, m2, result);
+        // naive_parallel_matmul(m1, m2, result);
+        blocked_parallel_matmul(m1, m2, result);
 
         uint64_t time = tm.read();
         if (i < 5)
