@@ -495,7 +495,6 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
     size_t width = std::min(hsize - p, COL_BLOCK);
-    std::cout << "width" << width << std::endl;
     const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
     const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
     const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
@@ -511,7 +510,6 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 
     for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
       size_t height = std::min(bsize - pp, ROW_BLOCK);
-      std::cout << "height" << height << std::endl;
       const MatrixView<float> h_pp(h, pp, 0, height, hsize);
       auto h_Wf_pp_p = serial_matmul(h_pp, Wf_p);
       auto h_Wi_pp_p = serial_matmul(h_pp, Wi_p);
@@ -529,9 +527,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
       auto j_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wc_pp_p, x_Uc_pp_p), bc_p), std::tanh);
 
       const MatrixView<float> c_pp_p (c, pp, p, height, width);
-      std::cout << "c_pp_p" << std::endl;
       auto cprime_pp_p = serial_cwise_add(serial_cwise_mul(f_pp_p, c_pp_p), serial_cwise_mul(i_pp_p, j_pp_p));
-      std::cout << "cprime_pp_p" << std::endl;
 
 
       set_matrix_data(cprime, cprime_pp_p, pp, p, height, width);
@@ -550,7 +546,61 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
 {
 // BEGIN YOUR CODE HERE
 
-// Write the parallel implementation of LSTM here
+  static const size_t COL_BLOCK = 32;
+  static const size_t ROW_BLOCK = 32;
+
+  size_t xsize = x.cols();
+  size_t hsize = h.cols();
+  size_t bsize = x.rows(); // batch size
+  const VectorView<float> bf(biases, 0, hsize);
+  const VectorView<float> bi(biases, hsize, hsize);
+  const VectorView<float> bo(biases, 2*hsize, hsize);
+  const VectorView<float> bc(biases, 3*hsize, hsize);
+
+  for (size_t p = 0; p < hsize; p+= COL_BLOCK){
+    size_t width = std::min(hsize - p, COL_BLOCK);
+    const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
+    const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
+    const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
+    const MatrixView<float> Wc_p(weights, 0, 3*hsize + p, hsize, width);
+    const MatrixView<float> Uf_p(weights, hsize, p, xsize, width);
+    const MatrixView<float> Ui_p(weights, hsize, hsize + p, xsize, width);
+    const MatrixView<float> Uo_p(weights, hsize, 2*hsize + p, xsize, width);
+    const MatrixView<float> Uc_p(weights, hsize, 3*hsize + p, xsize, width);
+    const VectorView<float> bf_p(bf, p, width);
+    const VectorView<float> bi_p(bi, p, width);
+    const VectorView<float> bo_p(bo, p, width);
+    const VectorView<float> bc_p(bc, p, width);
+
+    for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
+      size_t height = std::min(bsize - pp, ROW_BLOCK);
+      const MatrixView<float> h_pp(h, pp, 0, height, hsize);
+      auto h_Wf_pp_p = serial_matmul(h_pp, Wf_p);
+      auto h_Wi_pp_p = serial_matmul(h_pp, Wi_p);
+      auto h_Wo_pp_p = serial_matmul(h_pp, Wo_p);
+      auto h_Wc_pp_p = serial_matmul(h_pp, Wc_p);
+
+      const MatrixView<float> x_pp(x, pp, 0, height, xsize);
+      auto x_Uf_pp_p = serial_matmul(x_pp, Uf_p);
+      auto x_Ui_pp_p = serial_matmul(x_pp, Ui_p);
+      auto x_Uo_pp_p = serial_matmul(x_pp, Uo_p);
+      auto x_Uc_pp_p = serial_matmul(x_pp, Uc_p);
+
+      auto f_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wf_pp_p, x_Uf_pp_p), bf_p), sigmoid);
+      auto i_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wi_pp_p, x_Ui_pp_p), bi_p), sigmoid);
+      auto j_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wc_pp_p, x_Uc_pp_p), bc_p), std::tanh);
+
+      const MatrixView<float> c_pp_p (c, pp, p, height, width);
+      auto cprime_pp_p = serial_cwise_add(serial_cwise_mul(f_pp_p, c_pp_p), serial_cwise_mul(i_pp_p, j_pp_p));
+
+
+      set_matrix_data(cprime, cprime_pp_p, pp, p, height, width);
+
+      auto o_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wo_pp_p, x_Uo_pp_p), bo_p), sigmoid);
+      auto hprime_pp_p = serial_cwise_mul(o_pp_p, serial_cwise_unary_op(cprime_pp_p, std::tanh));
+      set_matrix_data(hprime, hprime_pp_p, pp, p, height, width);
+    }
+  }
 
 // END YOUR CODE HERE
 }
