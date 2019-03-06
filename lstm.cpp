@@ -311,14 +311,37 @@ serial_broadcast_add_second(const MatrixView<float>& m, const VectorView<float>&
     return m2;
 }
 
+
+static void print_mat(const MatrixView<float> mat){
+    for (size_t i = 0; i < mat.rows(); i ++) {
+      for (size_t j = 0; j < mat.cols(); j ++) {
+	std::cout << mat.at(i, j) << ", "; 
+      }
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+static void print_mat(const Matrix<float> mat){
+    for (size_t i = 0; i < mat.rows(); i ++) {
+      for (size_t j = 0; j < mat.cols(); j ++) {
+	std::cout << mat.at(i, j) << ", "; 
+      }
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+
 static void set_matrix_data(Matrix<float>& orig, const Matrix<float>& data, size_t i_start,
 			    size_t j_start, size_t height, size_t width){
-  for (size_t i = i_start; i <= i_start + width; i++){
-    for (size_t j = j_start; j <= j_start + height; j++){
+  for (size_t i = i_start; i < i_start + height; i++){
+    for (size_t j = j_start; j < j_start + width; j++){
       orig.at(i, j) = data.at(i - i_start, j - j_start);
     }
   }
 }
+
 
 // (optional) END YOUR CODE HERE
 
@@ -414,25 +437,7 @@ sigmoid(float x)
 }
 
 
-static void print_mat(const MatrixView<float> mat){
-    for (size_t i = 0; i < mat.rows(); i ++) {
-      for (size_t j = 0; j < mat.cols(); j ++) {
-	std::cout << mat.at(i, j) << ", "; 
-      }
-      std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
 
-static void print_mat(const Matrix<float> mat){
-    for (size_t i = 0; i < mat.rows(); i ++) {
-      for (size_t j = 0; j < mat.cols(); j ++) {
-	std::cout << mat.at(i, j) << ", "; 
-      }
-      std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
 
 static
 void kernel_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
@@ -490,6 +495,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
     size_t width = std::min(hsize - p, COL_BLOCK);
+    std::cout << "width" << width << std::endl;
     const MatrixView<float> Wf_p(weights, 0, p, hsize, width);    
     const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
     const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
@@ -505,6 +511,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     
     for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
       size_t height = std::min(bsize - pp, ROW_BLOCK);
+      std::cout << "height" << height << std::endl;
       const MatrixView<float> h_pp(h, pp, 0, height, hsize);      
       auto h_Wf_pp_p = serial_matmul(h_pp, Wf_p);
       auto h_Wi_pp_p = serial_matmul(h_pp, Wi_p);
@@ -520,11 +527,17 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
       auto f_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wf_pp_p, x_Uf_pp_p), bf_p), sigmoid);
       auto i_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wi_pp_p, x_Ui_pp_p), bi_p), sigmoid);
       auto j_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wc_pp_p, x_Uc_pp_p), bc_p), std::tanh);
-      
-      const MatrixView<float> c_pp_p (c, pp, p, height, width);
-      auto cprime_pp_p = serial_cwise_add(serial_cwise_mul(f_pp_p, c_pp_p), serial_cwise_mul(i_pp_p, j_pp_p));
-      set_matrix_data(cprime, cprime_pp_p, pp, p, height, width);
 
+      const MatrixView<float> c_pp_p (c, pp, p, height, width);
+      std::cout << "c_pp_p" << std::endl;
+      print_mat(c_pp_p);
+      auto cprime_pp_p = serial_cwise_add(serial_cwise_mul(f_pp_p, c_pp_p), serial_cwise_mul(i_pp_p, j_pp_p));
+      std::cout << "cprime_pp_p" << std::endl;
+      print_mat(cprime_pp_p);
+
+      
+      set_matrix_data(cprime, cprime_pp_p, pp, p, height, width);
+      
       auto o_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wo_pp_p, x_Uo_pp_p), bo_p), sigmoid);
       auto hprime_pp_p = serial_cwise_mul(o_pp_p, serial_cwise_unary_op(cprime_pp_p, std::tanh));
       set_matrix_data(hprime, hprime_pp_p, pp, p, height, width);
@@ -577,42 +590,22 @@ int main(int argc, const char** argv)
         const Matrix<float> c = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
 
 
-		
-	print_mat(h);
-	print_mat(c);
-	
-
-
-	
         Timer tm(CLOCK_MONOTONIC);
 
 	if (method == 1){
 	  Matrix<float> hprime(batchsize, hsize);
 	  Matrix<float> cprime(batchsize, hsize);
 	  kernel_lstm(weights, biases, x, h, c, hprime, cprime);
-	  std::cout << "kernel" << std::endl;
-	  print_mat(hprime);
-	  print_mat(cprime);
-
-	  
-
-	  //}
-	  //else if (method == 2){
+	}
+	else if (method == 2){
 	  Matrix<float> hprime_(batchsize, hsize);
 	  Matrix<float> cprime_(batchsize, hsize);
 	  serial_lstm(weights, biases, x, h, c, hprime_, cprime_);
-	  std::cout << "serial" << std::endl;
-	  print_mat(hprime_);
-	  print_mat(cprime_);
 	}
 	else{
 	  Matrix<float> hprime__(batchsize, hsize);
 	  Matrix<float> cprime__(batchsize, hsize);
 	  parallel_lstm(weights, biases, x, h, c, hprime__, cprime__);
-	  std::cout << "parallel" << std::endl;
-	  print_mat(hprime__);
-	  print_mat(cprime__);
-
 	}
         uint64_t time = tm.read();
         if (i < 5)
