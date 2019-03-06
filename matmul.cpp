@@ -214,9 +214,9 @@ int main(int argc, const char** argv)
 
         Timer tm(CLOCK_MONOTONIC);
 
-        // serial_matmul(m1, m2, result);
+        serial_matmul(m1, m2, result);
         // naive_parallel_matmul(m1, m2, result);
-        blocked_parallel_matmul(m1, m2, result);
+        // blocked_parallel_matmul(m1, m2, result);
 
         uint64_t time = tm.read();
         if (i < 5)

@@ -249,16 +249,6 @@ void parallel_sor(Matrix<float>& m, float c)
   }
 }
 
-static void print_mat(const Matrix<float> mat){
-    for (size_t i = 0; i < mat.rows(); i ++) {
-      for (size_t j = 0; j < mat.cols(); j ++) {
-        std::cout << mat.at(i, j) << ", ";
-      }
-      std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
-
 int main(int argc, const char** argv)
 {
     size_t row1, col1;
@@ -283,12 +273,9 @@ int main(int argc, const char** argv)
 
         Timer tm(CLOCK_MONOTONIC);
 	
-	// print_mat(m);
         // serial_sor(m, c);
-	// print_mat(m);
 
         parallel_sor(m, c);
-        // print_mat(m);
 
         uint64_t time = tm.read();
         if (i < 5)
