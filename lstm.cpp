@@ -637,9 +637,9 @@ int main(int argc, const char** argv)
 
       Timer tm(CLOCK_MONOTONIC);
 
-      kernel_lstm(weights, biases, x, h, c, hprime, cprime);
+      // kernel_lstm(weights, biases, x, h, c, hprime, cprime);
       // parallel_lstm(weights, biases, x, h, c, hprime, cprime);
-      // serial_lstm(weights, biases, x, h, c, hprime, cprime);
+      serial_lstm(weights, biases, x, h, c, hprime, cprime);
 
       uint64_t time = tm.read();
       if (i < 5)
