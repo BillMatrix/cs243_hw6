@@ -609,66 +609,51 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
 
 int main(int argc, const char** argv)
 {
-    if (argc < 4) {
-        std::cerr << "usage:" << argv[0] << " <B> <X> <H>" << std::endl;
-        return 1;
-    }
-    size_t batchsize = std::stoul(argv[1]);
-    size_t xsize = std::stoul(argv[2]);
-    size_t hsize = std::stoul(argv[3]);
+  if (argc < 4) {
+      std::cerr << "usage:" << argv[0] << " <B> <X> <H>" << std::endl;
+      return 1;
+  }
+  size_t batchsize = std::stoul(argv[1]);
+  size_t xsize = std::stoul(argv[2]);
+  size_t hsize = std::stoul(argv[3]);
 
-    //
-    size_t method = std::stoul(argv[4]);
-    //
+  std::mt19937_64 random_engine;
+  std::normal_distribution<float> distribution{0, 1};
 
-    std::mt19937_64 random_engine;
-    std::normal_distribution<float> distribution{0, 1};
+  const int NUM_ITERATIONS = 20;
+  uint64_t sum_time = 0;
+  uint64_t sum_time_squared = 0;
 
-    const int NUM_ITERATIONS = 20;
-    uint64_t sum_time = 0;
-    uint64_t sum_time_squared = 0;
+  auto weights = generate_matrix<float>(hsize+xsize, 4*hsize, distribution, random_engine);
+  auto biases = generate_vector<float>(4*hsize, distribution, random_engine);
 
-    auto weights = generate_matrix<float>(hsize+xsize, 4*hsize, distribution, random_engine);
-    auto biases = generate_vector<float>(4*hsize, distribution, random_engine);
+  // ignore the first 5 iterations as the processor warms up
+  for (int i = 0; i < 5+NUM_ITERATIONS; i++) {
+      const Matrix<float> x = generate_matrix<float>(batchsize, xsize, distribution, random_engine);
+      const Matrix<float> h = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
+      const Matrix<float> c = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
+      Matrix<float> hprime(batchsize, hsize);
+      Matrix<float> cprime(batchsize, hsize);
 
+      Timer tm(CLOCK_MONOTONIC);
 
-    // ignore the first 5 iterations as the processor warms up
-    for (int i = 0; i < 5+NUM_ITERATIONS; i++) {
-        const Matrix<float> x = generate_matrix<float>(batchsize, xsize, distribution, random_engine);
-        const Matrix<float> h = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
-        const Matrix<float> c = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
+      kernel_lstm(weights, biases, x, h, c, hprime, cprime);
+      // parallel_lstm(weights, biases, x, h, c, hprime, cprime);
+      // serial_lstm(weights, biases, x, h, c, hprime, cprime);
 
+      uint64_t time = tm.read();
+      if (i < 5)
+          continue;
+      std::cerr << "Iteration " << (i-5+1) << ": " << time << " us" << std::endl;
+      sum_time += time;
+      sum_time_squared += time * time;
+  }
 
-        Timer tm(CLOCK_MONOTONIC);
-
-	if (method == 1){
-	  Matrix<float> hprime(batchsize, hsize);
-	  Matrix<float> cprime(batchsize, hsize);
-	  kernel_lstm(weights, biases, x, h, c, hprime, cprime);
-	}
-	else if (method == 2){
-	  Matrix<float> hprime_(batchsize, hsize);
-	  Matrix<float> cprime_(batchsize, hsize);
-	  serial_lstm(weights, biases, x, h, c, hprime_, cprime_);
-	}
-	else{
-	  Matrix<float> hprime__(batchsize, hsize);
-	  Matrix<float> cprime__(batchsize, hsize);
-	  parallel_lstm(weights, biases, x, h, c, hprime__, cprime__);
-	}
-        uint64_t time = tm.read();
-        if (i < 5)
-            continue;
-        std::cerr << "Iteration " << (i-5+1) << ": " << time << " us" << std::endl;
-        sum_time += time;
-        sum_time_squared += time * time;
-    }
-
-    double avg_time = ((double)sum_time/NUM_ITERATIONS);
-    double avg_time_squared = ((double)sum_time_squared/NUM_ITERATIONS);
-    double std_dev = sqrt(avg_time_squared - avg_time * avg_time);
-    std::cerr << std::setprecision(0) << std::fixed;
-    std::cerr << "Avg time: " << avg_time << " us" << std::endl;
-    std::cerr << "Stddev: ±" << std_dev << " us" << std::endl;
-    return 0;
+  double avg_time = ((double)sum_time/NUM_ITERATIONS);
+  double avg_time_squared = ((double)sum_time_squared/NUM_ITERATIONS);
+  double std_dev = sqrt(avg_time_squared - avg_time * avg_time);
+  std::cerr << std::setprecision(0) << std::fixed;
+  std::cerr << "Avg time: " << avg_time << " us" << std::endl;
+  std::cerr << "Stddev: ±" << std_dev << " us" << std::endl;
+  return 0;
 }
