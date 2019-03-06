@@ -559,21 +559,21 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
 
 #pragma omp parallel for collapse(2)
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
-    size_t width = std::min(hsize - p, COL_BLOCK);
-    const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
-    const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
-    const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
-    const MatrixView<float> Wc_p(weights, 0, 3*hsize + p, hsize, width);
-    const MatrixView<float> Uf_p(weights, hsize, p, xsize, width);
-    const MatrixView<float> Ui_p(weights, hsize, hsize + p, xsize, width);
-    const MatrixView<float> Uo_p(weights, hsize, 2*hsize + p, xsize, width);
-    const MatrixView<float> Uc_p(weights, hsize, 3*hsize + p, xsize, width);
-    const VectorView<float> bf_p(bf, p, width);
-    const VectorView<float> bi_p(bi, p, width);
-    const VectorView<float> bo_p(bo, p, width);
-    const VectorView<float> bc_p(bc, p, width);
-
     for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
+      size_t width = std::min(hsize - p, COL_BLOCK);
+      const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
+      const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
+      const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
+      const MatrixView<float> Wc_p(weights, 0, 3*hsize + p, hsize, width);
+      const MatrixView<float> Uf_p(weights, hsize, p, xsize, width);
+      const MatrixView<float> Ui_p(weights, hsize, hsize + p, xsize, width);
+      const MatrixView<float> Uo_p(weights, hsize, 2*hsize + p, xsize, width);
+      const MatrixView<float> Uc_p(weights, hsize, 3*hsize + p, xsize, width);
+      const VectorView<float> bf_p(bf, p, width);
+      const VectorView<float> bi_p(bi, p, width);
+      const VectorView<float> bo_p(bo, p, width);
+      const VectorView<float> bc_p(bc, p, width);
+
       size_t height = std::min(bsize - pp, ROW_BLOCK);
       const MatrixView<float> h_pp(h, pp, 0, height, hsize);
       auto h_Wf_pp_p = serial_matmul(h_pp, Wf_p);
