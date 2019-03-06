@@ -315,7 +315,7 @@ serial_broadcast_add_second(const MatrixView<float>& m, const VectorView<float>&
 static void print_mat(const MatrixView<float> mat){
     for (size_t i = 0; i < mat.rows(); i ++) {
       for (size_t j = 0; j < mat.cols(); j ++) {
-	std::cout << mat.at(i, j) << ", "; 
+	std::cout << mat.at(i, j) << ", ";
       }
       std::cout << std::endl;
     }
@@ -325,7 +325,7 @@ static void print_mat(const MatrixView<float> mat){
 static void print_mat(const Matrix<float> mat){
     for (size_t i = 0; i < mat.rows(); i ++) {
       for (size_t j = 0; j < mat.cols(); j ++) {
-	std::cout << mat.at(i, j) << ", "; 
+	std::cout << mat.at(i, j) << ", ";
       }
       std::cout << std::endl;
     }
@@ -447,9 +447,9 @@ void kernel_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     // unpack the packed weights
     size_t xsize = x.cols();
     size_t hsize = h.cols();
-    
+
     //print_mat(weights);
-    const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);    
+    const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
     const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
     const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
     const MatrixView<float> Wc(weights, 0, 3*hsize, hsize, hsize);
@@ -484,7 +484,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 
   static const size_t COL_BLOCK = 32;
   static const size_t ROW_BLOCK = 32;
-  
+
   size_t xsize = x.cols();
   size_t hsize = h.cols();
   size_t bsize = x.rows(); // batch size
@@ -496,7 +496,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
     size_t width = std::min(hsize - p, COL_BLOCK);
     std::cout << "width" << width << std::endl;
-    const MatrixView<float> Wf_p(weights, 0, p, hsize, width);    
+    const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
     const MatrixView<float> Wi_p(weights, 0, hsize + p, hsize, width);
     const MatrixView<float> Wo_p(weights, 0, 2*hsize + p, hsize, width);
     const MatrixView<float> Wc_p(weights, 0, 3*hsize + p, hsize, width);
@@ -508,11 +508,11 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     const VectorView<float> bi_p(bi, p, width);
     const VectorView<float> bo_p(bo, p, width);
     const VectorView<float> bc_p(bc, p, width);
-    
+
     for (size_t pp = 0; pp < bsize; pp += ROW_BLOCK){
       size_t height = std::min(bsize - pp, ROW_BLOCK);
       std::cout << "height" << height << std::endl;
-      const MatrixView<float> h_pp(h, pp, 0, height, hsize);      
+      const MatrixView<float> h_pp(h, pp, 0, height, hsize);
       auto h_Wf_pp_p = serial_matmul(h_pp, Wf_p);
       auto h_Wi_pp_p = serial_matmul(h_pp, Wi_p);
       auto h_Wo_pp_p = serial_matmul(h_pp, Wo_p);
@@ -530,14 +530,12 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 
       const MatrixView<float> c_pp_p (c, pp, p, height, width);
       std::cout << "c_pp_p" << std::endl;
-      print_mat(c_pp_p);
       auto cprime_pp_p = serial_cwise_add(serial_cwise_mul(f_pp_p, c_pp_p), serial_cwise_mul(i_pp_p, j_pp_p));
       std::cout << "cprime_pp_p" << std::endl;
-      print_mat(cprime_pp_p);
 
-      
+
       set_matrix_data(cprime, cprime_pp_p, pp, p, height, width);
-      
+
       auto o_pp_p = serial_cwise_unary_op(serial_broadcast_add_second(serial_cwise_add(h_Wo_pp_p, x_Uo_pp_p), bo_p), sigmoid);
       auto hprime_pp_p = serial_cwise_mul(o_pp_p, serial_cwise_unary_op(cprime_pp_p, std::tanh));
       set_matrix_data(hprime, hprime_pp_p, pp, p, height, width);
@@ -571,7 +569,7 @@ int main(int argc, const char** argv)
     //
     size_t method = std::stoul(argv[4]);
     //
-    
+
     std::mt19937_64 random_engine;
     std::normal_distribution<float> distribution{0, 1};
 
@@ -582,7 +580,7 @@ int main(int argc, const char** argv)
     auto weights = generate_matrix<float>(hsize+xsize, 4*hsize, distribution, random_engine);
     auto biases = generate_vector<float>(4*hsize, distribution, random_engine);
 
-    
+
     // ignore the first 5 iterations as the processor warms up
     for (int i = 0; i < 5+NUM_ITERATIONS; i++) {
         const Matrix<float> x = generate_matrix<float>(batchsize, xsize, distribution, random_engine);
