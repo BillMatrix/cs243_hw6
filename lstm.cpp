@@ -557,6 +557,7 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
   const VectorView<float> bo(biases, 2*hsize, hsize);
   const VectorView<float> bc(biases, 3*hsize, hsize);
 
+#pragma omp parallel for collapse(2)
   for (size_t p = 0; p < hsize; p+= COL_BLOCK){
     size_t width = std::min(hsize - p, COL_BLOCK);
     const MatrixView<float> Wf_p(weights, 0, p, hsize, width);
